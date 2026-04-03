@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CineMatch — Smart Movie Recommendations</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#03010a;
+  --s1:#080514;
+  --s2:#0d0920;
+  --s3:#13102b;
+  --s4:#1a1738;
+  --border:rgba(180,150,255,0.08);
+  --border2:rgba(180,150,255,0.18);
+  --accent:#c084fc;
+  --accent2:#e879f9;
+  --accent3:#818cf8;
+  --gold:#fbbf24;
+  --teal:#34d399;
+  --red:#f87171;
+  --rose:#fb7185;
+  --text:#f0eeff;
+  --muted:#7c7a99;
+  --muted2:#a8a4c8;
+  --r:14px;
+  --r-sm:9px;
+  --glow:rgba(192,132,252,0.18);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ANIMATED BACKGROUND */
+.bg-canvas{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.bg-canvas::before{content:'';position:absolute;width:900px;height:900px;background:radial-gradient(circle,rgba(192,132,252,0.12) 0%,transparent 70%);top:-200px;right:-200px;animation:drift1 18s ease-in-out infinite alternate}
+.bg-canvas::after{content:'';position:absolute;width:700px;height:700px;background:radial-gradient(circle,rgba(129,140,248,0.1) 0%,transparent 70%);bottom:-150px;left:-150px;animation:drift2 22s ease-in-out infinite alternate}
+.bg-orb3{position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(251,113,133,0.06) 0%,transparent 70%);top:40%;left:35%;animation:drift3 26s ease-in-out infinite alternate}
+@keyframes drift1{0%{transform:translate(0,0) scale(1)}100%{transform:translate(-60px,80px) scale(1.15)}}
+@keyframes drift2{0%{transform:translate(0,0) scale(1)}100%{transform:translate(80px,-60px) scale(1.2)}}
+@keyframes drift3{0%{transform:translate(0,0)}100%{transform:translate(-40px,60px)}}
+
+/* NOISE TEXTURE */
+.noise{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* SCANLINES */
+.scanlines{position:fixed;inset:0;z-index:0;pointer-events:none;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px)}
+
+.wrap{position:relative;z-index:1;max-width:1480px;margin:0 auto;padding:0 32px 100px}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:30px 0 36px;border-bottom:1px solid var(--border);margin-bottom:40px}
+.brand{display:flex;align-items:center;gap:18px}
+.brand-icon{position:relative;width:52px;height:52px}
+.brand-icon-inner{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent3));display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 0 30px rgba(192,132,252,0.4)}
+.brand-icon-ring{position:absolute;inset:-3px;border-radius:17px;border:1px solid rgba(192,132,252,0.4);animation:ringPulse 3s ease-in-out infinite}
+@keyframes ringPulse{0%,100%{opacity:0.4;transform:scale(1)}50%{opacity:1;transform:scale(1.03)}}
+.brand-text h1{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;letter-spacing:1px;background:linear-gradient(90deg,var(--text),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.brand-text p{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:3px;text-transform:uppercase;margin-top:5px}
+.topbar-right{display:flex;align-items:center;gap:14px}
+.status-badge{font-family:'Space Mono',monospace;font-size:11px;padding:8px 18px;border-radius:20px;color:var(--teal);background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);animation:statusGlow 4s ease-in-out infinite}
+@keyframes statusGlow{0%,100%{box-shadow:0 0 0 rgba(52,211,153,0)}50%{box-shadow:0 0 16px rgba(52,211,153,0.2)}}
+
+/* STATS */
+.statsbar{display:flex;gap:8px;margin-bottom:34px;flex-wrap:wrap}
+.stat-pill{display:flex;align-items:center;gap:10px;padding:10px 20px;background:var(--s1);border:1px solid var(--border);border-radius:24px;font-size:13px;transition:all 0.3s;cursor:default}
+.stat-pill:hover{border-color:var(--border2);background:var(--s2)}
+.stat-num{font-family:'Playfair Display',serif;font-size:22px;color:var(--accent);line-height:1;min-width:28px}
+.stat-lbl{color:var(--muted2);font-size:12px}
+
+/* LAYOUT */
+.main{display:grid;grid-template-columns:310px 1fr;gap:26px;align-items:start}
+@media(max-width:980px){.main{grid-template-columns:1fr}}
+.sidebar{display:flex;flex-direction:column;gap:22px}
+
+/* PANELS */
+.panel{background:linear-gradient(160deg,var(--s1),var(--s2));border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:border-color 0.3s}
+.panel:hover{border-color:var(--border2)}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--border);background:rgba(192,132,252,0.03)}
+.ph-title{font-family:'Space Mono',monospace;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--muted2)}
+.pb{padding:18px 22px}
+
+/* BUTTONS */
+.btn{padding:10px 20px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;border:none;display:inline-flex;align-items:center;gap:7px}
+.btn-accent{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0014;box-shadow:0 4px 20px rgba(192,132,252,0.3)}
+.btn-accent:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(192,132,252,0.45)}
+.btn-ghost{background:transparent;color:var(--muted2);border:1px solid var(--border2)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);background:rgba(192,132,252,0.06)}
+.btn-teal{background:rgba(52,211,153,0.12);color:var(--teal);border:1px solid rgba(52,211,153,0.25)}
+.btn-teal:hover{background:rgba(52,211,153,0.2)}
+.sec-action{font-size:12px;color:var(--accent);cursor:pointer;background:none;border:none;font-family:'DM Sans',sans-serif;opacity:0.7;transition:opacity 0.2s}
+.sec-action:hover{opacity:1;text-decoration:underline}
+
+/* USER PANEL */
+.user-tabs{display:flex;flex-direction:column;gap:4px}
+.user-tab{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r-sm);cursor:pointer;transition:all 0.2s;border:1px solid transparent;background:transparent;width:100%;text-align:left}
+.user-tab:hover{background:var(--s3)}
+.user-tab.active{background:rgba(192,132,252,0.1);border-color:rgba(192,132,252,0.3)}
+.u-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0;letter-spacing:1px}
+.u-name{font-size:13px;font-weight:600;color:var(--text)}
+.u-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.new-user-row{margin-top:12px;display:flex;gap:8px}
+.input-sm{flex:1;padding:9px 13px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s}
+.input-sm:focus{border-color:var(--accent)}
+.input-sm::placeholder{color:var(--muted)}
+
+/* SEARCH */
+.search-wrap{position:relative;margin-bottom:14px}
+.search-wrap input{width:100%;padding:12px 14px 12px 42px;background:var(--s2);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:all 0.2s}
+.search-wrap input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(192,132,252,0.1)}
+.search-wrap input::placeholder{color:var(--muted)}
+.search-ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:16px;pointer-events:none;transition:color 0.2s}
+.search-wrap input:focus~.search-ico{color:var(--accent)}
+.search-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--s2);border:1px solid var(--border2);border-radius:var(--r);z-index:200;max-height:360px;overflow-y:auto;display:none;box-shadow:0 20px 60px rgba(0,0,0,0.5);backdrop-filter:blur(20px)}
+.search-dropdown.open{display:block;animation:dropIn 0.18s ease}
+@keyframes dropIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.sd-item{display:flex;align-items:center;gap:13px;padding:11px 16px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid var(--border)}
+.sd-item:last-child{border-bottom:none}
+.sd-item:hover{background:var(--s3)}
+.sd-thumb{width:36px;height:54px;border-radius:6px;object-fit:cover;background:var(--s3);flex-shrink:0;border:1px solid var(--border)}
+.sd-title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sd-year{font-size:11px;color:var(--muted);margin-top:2px}
+.sd-rating{font-family:'Space Mono',monospace;font-size:12px;color:var(--gold);flex-shrink:0}
+.search-hist-label{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:10px}
+.search-hist-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)}
+.search-hist-item:last-child{border-bottom:none}
+.search-hist-q{font-size:13px;color:var(--muted2);cursor:pointer;transition:color 0.15s}
+.search-hist-q:hover{color:var(--accent)}
+
+/* GENRE PILLS */
+.genre-pills{display:flex;gap:6px;flex-wrap:wrap}
+.gpill{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-family:'DM Sans',sans-serif;transition:all 0.18s}
+.gpill:hover,.gpill.on{border-color:var(--accent);color:var(--accent);background:rgba(192,132,252,0.1);box-shadow:0 0 12px rgba(192,132,252,0.15)}
+
+/* WATCH HISTORY */
+.hist-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border);animation:slideIn 0.3s ease}
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.hist-item:last-child{border-bottom:none}
+.hist-thumb{width:32px;height:48px;border-radius:5px;object-fit:cover;background:var(--s3);flex-shrink:0;border:1px solid var(--border)}
+.hist-title{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.hist-stars{color:var(--gold)}
+.hist-remove{color:var(--muted);cursor:pointer;font-size:18px;padding:2px 4px;background:none;border:none;transition:color 0.15s;line-height:1;flex-shrink:0}
+.hist-remove:hover{color:var(--red)}
+
+/* CONTENT AREA */
+.content{display:flex;flex-direction:column;gap:26px}
+
+/* MOVIE GRID */
+.movie-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:18px}
+.mcard{cursor:pointer;transition:all 0.25s;position:relative;border-radius:var(--r-sm);overflow:visible}
+.mcard:hover{transform:translateY(-8px) scale(1.02)}
+.mcard:hover .mc-img{border-color:var(--accent);box-shadow:0 16px 40px rgba(192,132,252,0.35)}
+.mc-img{width:100%;aspect-ratio:2/3;border-radius:var(--r-sm);object-fit:cover;background:var(--s3);border:1px solid var(--border);display:block;transition:all 0.25s}
+.mc-overlay{position:absolute;inset:0;border-radius:var(--r-sm);background:linear-gradient(to top,rgba(3,1,10,0.97) 0%,rgba(3,1,10,0.4) 45%,transparent 100%);opacity:0;transition:opacity 0.25s}
+.mcard:hover .mc-overlay{opacity:1}
+.mc-actions{position:absolute;bottom:10px;left:8px;right:8px;opacity:0;transition:all 0.25s;display:flex;gap:5px;transform:translateY(6px)}
+.mcard:hover .mc-actions{opacity:1;transform:translateY(0)}
+.mc-btn{flex:1;padding:7px 4px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all 0.15s;text-align:center}
+.mc-btn.watch{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0014}
+.mc-btn.watch:hover{opacity:0.9}
+.mc-btn.info{background:rgba(255,255,255,0.15);color:var(--text);backdrop-filter:blur(8px)}
+.mc-btn.info:hover{background:rgba(255,255,255,0.25)}
+.mc-score{position:absolute;top:8px;right:8px;background:rgba(3,1,10,0.88);border-radius:5px;padding:3px 8px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:var(--gold);border:1px solid rgba(251,191,36,0.3);backdrop-filter:blur(4px)}
+.mc-badge{position:absolute;top:8px;left:8px;border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:0.5px}
+.mc-badge-watched{background:var(--teal);color:#001a0d}
+.mc-badge-bw{background:linear-gradient(135deg,#ff6b35,#ff9500);color:#fff}
+.mc-title{font-size:12px;font-weight:600;margin-top:9px;line-height:1.35;color:var(--text)}
+.mc-year{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);margin-top:3px}
+.mc-placeholder{width:100%;aspect-ratio:2/3;border-radius:var(--r-sm);background:linear-gradient(135deg,var(--s2),var(--s3));border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:all 0.25s}
+.mc-placeholder .ph-icon{font-size:38px;opacity:0.5}
+.mc-placeholder .ph-title-text{font-size:11px;color:var(--muted);text-align:center;padding:0 8px;font-weight:600}
+
+/* RECOMMENDATIONS */
+.rec-list{display:flex;flex-direction:column;gap:14px}
+.rcard{display:flex;gap:18px;align-items:flex-start;padding:18px;background:linear-gradient(160deg,var(--s2),var(--s3));border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:all 0.25s;animation:fadeUp 0.4s ease forwards;opacity:0;transform:translateY(12px);position:relative;overflow:hidden}
+.rcard::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(192,132,252,0.04),transparent);opacity:0;transition:opacity 0.25s}
+.rcard:hover::before{opacity:1}
+.rcard:hover{border-color:rgba(192,132,252,0.35);transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,0.3)}
+@keyframes fadeUp{to{opacity:1;transform:translateY(0)}}
+.rcard-rank{font-family:'Playfair Display',serif;font-size:48px;font-style:italic;color:rgba(192,132,252,0.15);line-height:1;min-width:50px;text-align:center;transition:color 0.25s}
+.rcard:hover .rcard-rank,.rcard.top .rcard-rank{color:var(--accent)}
+.rcard-poster{width:58px;height:88px;border-radius:8px;object-fit:cover;background:var(--s3);flex-shrink:0;border:1px solid var(--border);transition:border-color 0.25s}
+.rcard:hover .rcard-poster{border-color:var(--accent)}
+.rcard-body{flex:1;min-width:0}
+.rcard-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:700;margin-bottom:7px;line-height:1.3}
+.rcard-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.5px}
+.badge-purple{background:rgba(192,132,252,0.15);color:var(--accent);border:1px solid rgba(192,132,252,0.3)}
+.badge-gold{background:rgba(251,191,36,0.12);color:var(--gold);border:1px solid rgba(251,191,36,0.25)}
+.badge-teal{background:rgba(52,211,153,0.1);color:var(--teal);border:1px solid rgba(52,211,153,0.22)}
+.badge-muted{background:var(--s4);color:var(--muted2);border:1px solid var(--border)}
+.badge-rose{background:rgba(251,113,133,0.1);color:var(--rose);border:1px solid rgba(251,113,133,0.22)}
+.rcard-reason{font-size:12px;color:var(--muted2);font-style:italic;margin-bottom:12px;line-height:1.6;padding-left:10px;border-left:2px solid rgba(192,132,252,0.3)}
+.rcard-bars{display:flex;flex-direction:column;gap:6px}
+.bar-row{display:flex;align-items:center;gap:9px}
+.bar-label{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);min-width:52px}
+.bar-track{flex:1;height:3px;background:var(--s4);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;border-radius:2px;transition:width 1s cubic-bezier(.4,0,.2,1)}
+.bar-purple{background:linear-gradient(90deg,var(--accent3),var(--accent))}
+.bar-teal{background:linear-gradient(90deg,var(--teal),#6ee7b7)}
+.rcard-score-box{text-align:right;flex-shrink:0}
+.rcard-score{font-family:'Playfair Display',serif;font-size:36px;font-weight:900;font-style:italic;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.rcard-score-lbl{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px}
+.rcard-watch-btn{margin-top:12px;padding:7px 18px;background:rgba(192,132,252,0.15);color:var(--accent);border:1px solid rgba(192,132,252,0.3);border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
+.rcard-watch-btn:hover{background:rgba(192,132,252,0.25);border-color:var(--accent)}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:52px 20px;color:var(--muted)}
+.empty-ico{font-size:48px;opacity:0.3;margin-bottom:16px;animation:float 4s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.empty p{font-size:14px;line-height:1.8;color:var(--muted2)}
+
+/* TABS */
+.tab-row{display:flex;gap:6px;flex-wrap:wrap}
+.tab-btn{padding:7px 14px;border-radius:8px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.5px;cursor:pointer;transition:all 0.2s;border:none}
+.tab-btn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0014;box-shadow:0 4px 16px rgba(192,132,252,0.3)}
+.tab-btn.inactive{background:transparent;color:var(--muted2);border:1px solid var(--border2)}
+.tab-btn.inactive:hover{border-color:var(--accent);color:var(--accent)}
+
+/* MODAL */
+.modal-wrap{position:fixed;inset:0;background:rgba(3,1,10,0.85);backdrop-filter:blur(12px);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity 0.3s}
+.modal-wrap.open{opacity:1;pointer-events:all}
+.modal{background:linear-gradient(160deg,var(--s1),var(--s2));border:1px solid var(--border2);border-radius:20px;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;transform:translateY(24px) scale(0.97);transition:transform 0.3s;box-shadow:0 40px 120px rgba(0,0,0,0.7)}
+.modal-wrap.open .modal{transform:translateY(0) scale(1)}
+.modal-hero{position:relative;width:100%;height:240px;background:var(--s3);border-radius:20px 20px 0 0;overflow:hidden}
+.modal-backdrop{width:100%;height:100%;object-fit:cover;filter:brightness(0.38) saturate(1.3)}
+.modal-poster{position:absolute;bottom:-36px;left:28px;width:84px;height:126px;border-radius:10px;object-fit:cover;border:3px solid var(--s1);background:var(--s3);box-shadow:0 8px 30px rgba(0,0,0,0.5)}
+.modal-close{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(3,1,10,0.7);border:1px solid var(--border2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;backdrop-filter:blur(4px)}
+.modal-close:hover{background:var(--red);border-color:var(--red)}
+.modal-body{padding:56px 28px 28px}
+.modal-title{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;letter-spacing:0.5px;margin-bottom:10px;line-height:1.2}
+.modal-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.modal-overview{font-size:14px;color:var(--muted2);line-height:1.8;margin-bottom:22px}
+.modal-rate-label{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.modal-stars{display:flex;gap:8px;margin-bottom:20px}
+.mstar{font-size:28px;cursor:pointer;color:var(--s4);transition:all 0.12s;user-select:none}
+.mstar.on{color:var(--gold)}
+.mstar:hover{transform:scale(1.25)}
+.modal-actions{display:flex;gap:10px;flex-wrap:wrap}
+.modal-btn{padding:11px 24px;border-radius:var(--r-sm);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;border:none;transition:all 0.2s}
+.modal-btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#0a0014;box-shadow:0 4px 20px rgba(192,132,252,0.3)}
+.modal-btn.primary:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(192,132,252,0.45)}
+.modal-btn.ghost{background:var(--s3);color:var(--text);border:1px solid var(--border2)}
+.modal-btn.ghost:hover{border-color:var(--accent)}
+
+/* TOAST */
+#toast{position:fixed;bottom:30px;right:30px;z-index:600;background:linear-gradient(135deg,var(--s2),var(--s3));border:1px solid rgba(192,132,252,0.4);border-radius:var(--r);padding:14px 22px;font-size:14px;font-weight:500;transform:translateY(80px);opacity:0;transition:all 0.35s cubic-bezier(.34,1.56,.64,1);pointer-events:none;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,0.4)}
+#toast.show{transform:translateY(0);opacity:1}
+#toast .toast-icon{margin-right:8px}
+
+/* REC WHY BOX */
+.rec-why-box{background:rgba(192,132,252,0.06);border:1px solid rgba(192,132,252,0.15);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:18px;font-size:13px;color:var(--muted2);font-style:italic;line-height:1.6;display:none}
+.rec-why-box.visible{display:block}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:rgba(192,132,252,0.3);border-radius:2px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* LOADING SHIMMER */
+.shimmer{background:linear-gradient(90deg,var(--s2) 25%,var(--s3) 50%,var(--s2) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<div class="bg-canvas"><div class="bg-orb3"></div></div>
+<div class="noise"></div>
+<div class="scanlines"></div>
+
+<div class="wrap">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">
+      <div class="brand-icon-inner">🎬</div>
+      <div class="brand-icon-ring"></div>
+    </div>
+    <div class="brand-text">
+      <h1>CineMatch</h1>
+      <p>AI-Powered Recommendations</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="status-badge" id="status-badge">● 130 Movies Loaded</span>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="statsbar">
+  <div class="stat-pill"><span class="stat-num" id="s-watched">0</span><span class="stat-lbl">Watched</span></div>
+  <div class="stat-pill"><span class="stat-num" id="s-rated">0</span><span class="stat-lbl">Rated</span></div>
+  <div class="stat-pill"><span class="stat-num" id="s-searches">0</span><span class="stat-lbl">Searches</span></div>
+  <div class="stat-pill"><span class="stat-num" id="s-recs">0</span><span class="stat-lbl">Recommendations</span></div>
+</div>
+
+<div class="main">
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <!-- USER PANEL -->
+  <div class="panel">
+    <div class="ph"><span class="ph-title">Current User</span></div>
+    <div class="pb">
+      <div class="user-tabs" id="user-list"></div>
+      <div class="new-user-row">
+        <input class="input-sm" type="text" id="new-user-input" placeholder="Add new user..."/>
+        <button class="btn btn-accent" onclick="addUser()" style="padding:9px 14px">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="panel">
+    <div class="ph"><span class="ph-title">Search Movies</span></div>
+    <div class="pb">
+      <div class="search-wrap">
+        <input type="text" id="search-input" placeholder="Search by title, genre, tag..." oninput="onSearchInput(this.value)" onkeydown="handleSearchKey(event)" autocomplete="off"/>
+        <span class="search-ico">🔍</span>
+        <div class="search-dropdown" id="search-dropdown"></div>
+      </div>
+      <div class="search-hist-label">Recent Searches</div>
+      <div id="search-history-list"></div>
+    </div>
+  </div>
+
+  <!-- GENRE FILTER -->
+  <div class="panel">
+    <div class="ph"><span class="ph-title">Genre Filter</span></div>
+    <div class="pb"><div class="genre-pills" id="genre-pills"></div></div>
+  </div>
+
+  <!-- WATCH HISTORY -->
+  <div class="panel">
+    <div class="ph">
+      <span class="ph-title">Watch History</span>
+      <button class="sec-action" onclick="clearHistory()">Clear All</button>
+    </div>
+    <div class="pb" id="watch-history-list">
+      <div class="empty" style="padding:20px 0"><div class="empty-ico">📽</div><p style="font-size:12px">No movies watched yet</p></div>
+    </div>
+  </div>
+
+</div><!-- /sidebar -->
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- RECOMMENDATIONS -->
+  <div class="panel">
+    <div class="ph">
+      <span class="ph-title">Smart Recommendations</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="top-n" style="padding:7px 12px;background:var(--s2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'Space Mono',monospace;font-size:11px;outline:none">
+          <option value="5">Top 5</option>
+          <option value="10" selected>Top 10</option>
+          <option value="20">Top 20</option>
+        </select>
+      </div>
+    </div>
+    <div class="pb">
+      <!-- CTA shown when recs haven't been generated yet -->
+      <div id="rec-cta" style="text-align:center;padding:36px 16px">
+        <div style="font-size:44px;margin-bottom:14px;animation:float 4s ease-in-out infinite">✨</div>
+        <p style="font-size:14px;color:var(--muted2);line-height:1.8;margin-bottom:20px">
+          Mark movies as watched, then click below<br/>to get your personalised picks.
+        </p>
+        <button class="btn btn-accent" onclick="triggerRecommendations()" style="font-size:14px;padding:12px 28px">
+          ✦ Get My Recommendations
+        </button>
+      </div>
+      <!-- Rec results shown only after user clicks -->
+      <div id="rec-results" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div class="rec-why-box" id="rec-why" style="margin-bottom:0;flex:1"></div>
+          <button class="btn btn-ghost" onclick="triggerRecommendations()" style="padding:7px 14px;font-size:12px;flex-shrink:0">↻ Refresh</button>
+        </div>
+        <div id="rec-output"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISCOVER -->
+  <div class="panel">
+    <div class="ph">
+      <span class="ph-title">Discover</span>
+      <div class="tab-row">
+        <button class="tab-btn active" id="tab-trending" onclick="showTab('trending')">TRENDING</button>
+        <button class="tab-btn inactive" id="tab-bollywood" onclick="showTab('bollywood')">BOLLYWOOD</button>
+        <button class="tab-btn inactive" id="tab-toprated" onclick="showTab('toprated')">TOP RATED</button>
+        <button class="tab-btn inactive" id="tab-action" onclick="showTab('action')">ACTION</button>
+        <button class="tab-btn inactive" id="tab-drama" onclick="showTab('drama')">DRAMA</button>
+        <button class="tab-btn inactive" id="tab-scifi" onclick="showTab('scifi')">SCI-FI</button>
+        <button class="tab-btn inactive" id="tab-horror" onclick="showTab('horror')">HORROR</button>
+        <button class="tab-btn inactive" id="tab-comedy" onclick="showTab('comedy')">COMEDY</button>
+      </div>
+    </div>
+    <div class="pb">
+      <div class="movie-row" id="discover-grid"></div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /wrap -->
+
+<!-- MODAL -->
+<div class="modal-wrap" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-hero">
+      <img class="modal-backdrop" id="modal-backdrop" src="" alt="" onerror="this.style.display='none'"/>
+      <img class="modal-poster" id="modal-poster" src="" alt="" onerror="this.src='';this.style.background='var(--s3)'"/>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-title" id="modal-title"></div>
+      <div class="modal-meta" id="modal-meta"></div>
+      <div class="modal-overview" id="modal-overview"></div>
+      <div class="modal-rate-label">Rate this movie</div>
+      <div class="modal-stars">
+        <span class="mstar" data-v="1" onclick="modalRate(1)">★</span>
+        <span class="mstar" data-v="2" onclick="modalRate(2)">★</span>
+        <span class="mstar" data-v="3" onclick="modalRate(3)">★</span>
+        <span class="mstar" data-v="4" onclick="modalRate(4)">★</span>
+        <span class="mstar" data-v="5" onclick="modalRate(5)">★</span>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn primary" id="modal-watch-btn" onclick="modalMarkWatched()">✓ Mark as Watched</button>
+        <button class="modal-btn ghost" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const IMG   = 'https://image.tmdb.org/t/p/w342';
+const IMG_W = 'https://image.tmdb.org/t/p/w780';
+
+// Genre registry
+const GENRES = [
+  {id:1,name:'Action'},{id:3,name:'Crime'},{id:4,name:'Sci-Fi'},
+  {id:5,name:'Thriller'},{id:6,name:'Drama'},{id:7,name:'Adventure'},
+  {id:8,name:'Romance'},{id:9,name:'Bollywood'},{id:10,name:'Comedy'},
+  {id:11,name:'Animation'},{id:12,name:'Horror'},
+];
+
+// ──────────────────────────────────────────────────────────────
+//  MOVIE DATABASE  (130 movies)
+// ──────────────────────────────────────────────────────────────
+const MOVIES = [
+  // ── HOLLYWOOD ACTION ──
+  {id:1,  title:'The Dark Knight',              year:2008,rating:9.0,genres:[1,3,6], poster:'/qJ2tW6WMUDux911r6m7haRef0WH.jpg', back:'/hkBaDkMWbLaf8B1lsWsZX7Ko26X.jpg', overview:'Batman faces the anarchic Joker who plunges Gotham into chaos and moral ruin.',tags:['superhero','dark','iconic']},
+  {id:2,  title:'Inception',                    year:2010,rating:8.8,genres:[1,4,7], poster:'/ljsZTbVsrQSqZgWeep2B1QiDKuh.jpg', back:'/s3TBrRGB1iav7gFOCNx3H31MoES.jpg', overview:'A thief enters dreams to steal secrets and is given a chance to erase his criminal past.',tags:['mindbending','dreams','heist']},
+  {id:3,  title:'Interstellar',                 year:2014,rating:8.6,genres:[4,6,7], poster:'/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg', back:'/xJHokMbljvjADYdit5fK5VQsXEG.jpg', overview:'A team travels through a wormhole in space to ensure humanity\'s survival.',tags:['space','emotional','epic']},
+  {id:7,  title:'The Matrix',                   year:1999,rating:8.7,genres:[1,4,7], poster:'/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg', back:'/fNG7i7RqMErkcqhohV2a6cV1Ehy.jpg', overview:'A hacker discovers the world is a simulation and joins a rebellion.',tags:['reality','action','scifi']},
+  {id:10, title:'Avengers: Endgame',            year:2019,rating:8.4,genres:[1,7,4], poster:'/or06FN3Dka5tukK1e9sl16pB3iy.jpg', back:'/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg', overview:'The Avengers assemble one last time to reverse Thanos\'s devastating actions.',tags:['superhero','epic','finale']},
+  {id:18, title:'Mad Max: Fury Road',           year:2015,rating:8.1,genres:[1,7,4], poster:'/8tZYtuWezp8JbcsvHYO0O46tFbo.jpg', back:'/phszHPFzxBZRS7r4MJBnSAhk5L4.jpg', overview:'In a post-apocalyptic wasteland, Max teams with a rebel warrior to flee a tyrant.',tags:['action','postapocalyptic','chase']},
+  {id:19, title:'John Wick',                    year:2014,rating:7.4,genres:[1,3,5], poster:'/fZPSd91yGE9fCcCe6OoQr6E3Bev.jpg', back:'/umC04Cozevu8nn3JTDJ0kkZ8ber.jpg', overview:'An ex-hitman seeks vengeance after gangsters kill his puppy and steal his car.',tags:['action','revenge','hitman']},
+  {id:20, title:'Top Gun: Maverick',            year:2022,rating:8.3,genres:[1,7,8], poster:'/62HCnUTziyWcpDaBO2i1DX17ljH.jpg', back:'/AkozGSoSLZMhNkNmNFBsPkMoUZX.jpg', overview:'After 30 years, Maverick is called back to train a new generation of elite pilots.',tags:['action','military','sequel']},
+  {id:21, title:'Mission: Impossible – Fallout',year:2018,rating:7.7,genres:[1,5,7], poster:'/AkJQpZp9WoNdj7pLYSj1L0RcMMN.jpg', back:'/5qxePyMYDisLe8A3tGm4GEZlC6.jpg', overview:'Ethan Hunt races against time after a mission goes wrong.',tags:['spy','action','stunts']},
+  {id:22, title:'The Avengers',                 year:2012,rating:8.0,genres:[1,7,4], poster:'/RYMX2wcKCBAr24UyPD7KE3wYQnx.jpg', back:'/9BBTo63ANSmhC4e6r62OJFuK2GL.jpg', overview:'Earth\'s mightiest heroes assemble to stop Loki and his alien army.',tags:['superhero','teamup','marvel']},
+  {id:23, title:'Gladiator',                    year:2000,rating:8.5,genres:[1,7,6], poster:'/ty8TGRuvJLPUmAR1H1nRIsgwvim.jpg', back:'/6WxhEvFsauuACfv8HyoVX6mZKFj.jpg', overview:'A Roman general becomes a slave and rises as a gladiator to seek revenge.',tags:['epic','roman','revenge']},
+  {id:24, title:'Batman Begins',                year:2005,rating:8.2,genres:[1,3,6], poster:'/dr6x4mGWxYaHJxqJJf0Qqxn5JdV.jpg', back:'/uMMkIGNMQ6ybF5jqZYMq5JiYnHm.jpg', overview:'Bruce Wayne transforms himself into Batman to fight the criminal underworld.',tags:['origin','superhero','dark']},
+  {id:25, title:'Spider-Man: No Way Home',      year:2021,rating:8.3,genres:[1,7,4], poster:'/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg', back:'/14QbnygCuTO0vl7CAFmPf1fgZfV.jpg', overview:'Spider-Man\'s identity is revealed, causing multiverse chaos.',tags:['superhero','multiverse','marvel']},
+  {id:26, title:'Black Panther',                year:2018,rating:7.3,genres:[1,7,4], poster:'/uxzzxijgPIY7slzFvMotPv8wjKA.jpg', back:'/6ELJEzQJ3Y45HczvreqZg7GPnBD.jpg', overview:'T\'Challa returns home to reclaim his throne and protect his kingdom.',tags:['superhero','africa','marvel']},
+  {id:27, title:'300',                          year:2007,rating:7.7,genres:[1,7,6], poster:'/iWFByZer5W7lOX7oCLCwSJeWFlt.jpg', back:'/bVm6udIB9bkPCCLmzlVKnl6BXKM.jpg', overview:'King Leonidas leads 300 Spartans in a last stand against the Persian army.',tags:['ancient','war','action']},
+  {id:70, title:'The Dark Knight Rises',        year:2012,rating:8.4,genres:[1,3,6], poster:'/hr0L2aueqlP2BYQ17ELLmsq0jJM.jpg', back:'/kpB5KPStNS7SdlGnRDI5I8YkFkN.jpg', overview:'Eight years on, a new threat forces Batman out of retirement.',tags:['superhero','dark','finale']},
+  {id:71, title:'Iron Man',                     year:2008,rating:7.9,genres:[1,7,4], poster:'/78lPtwv72eTNqFW9COBYI0dWDJa.jpg', back:'/cyecCSsp2PKpAqLXGa0mSIfNMaF.jpg', overview:'Billionaire Tony Stark builds a powered suit of armor to escape captivity and become a hero.',tags:['superhero','origin','tech']},
+  {id:72, title:'Fast & Furious 7',             year:2015,rating:7.2,genres:[1,7,5], poster:'/dkMD5qlogeRMiEixC4YNPUvax2T.jpg', back:'/oKMk65cBRhPgP7sSFKPiDG0vFo4.jpg', overview:'Dominic Toretto and crew face a lethal mercenary while dealing with loss.',tags:['cars','action','tribute']},
+  {id:73, title:'Wonder Woman',                 year:2017,rating:7.4,genres:[1,7,8], poster:'/gfJGlDaHuWimErCr5Ql0I8x9QSy.jpg', back:'/9bM73jn4qsLKoO8vXXt0h89wNLG.jpg', overview:'When a pilot crashes and tells of conflict in the outside world, Diana leaves home.',tags:['superhero','war','female-lead']},
+  {id:74, title:'Captain America: Civil War',   year:2016,rating:7.8,genres:[1,7,4], poster:'/rAGiXaUfDiyMhKNGWPEOQhsS3af.jpg', back:'/m5O3SZhjeguSzsOHskrwHM3KDCO.jpg', overview:'Political pressure mounts to install a governing body to oversee the Avengers.',tags:['superhero','conflict','marvel']},
+
+  // ── CRIME / THRILLER ──
+  {id:4,  title:'The Godfather',                year:1972,rating:9.2,genres:[3,6],   poster:'/3bhkrj58Vtu7enYsLeSHOijA26X.jpg', back:'/tmU7GeKVybMWFButWEGl2M4GeiP.jpg', overview:'The patriarch of an organized crime dynasty transfers power to his reluctant son.',tags:['classic','mafia','drama']},
+  {id:5,  title:'Pulp Fiction',                 year:1994,rating:8.9,genres:[3,5,6], poster:'/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg', back:'/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg', overview:'The lives of two hitmen and a gangster\'s wife intertwine in tales of violence.',tags:['nonlinear','cool','dialogue']},
+  {id:9,  title:'Fight Club',                   year:1999,rating:8.8,genres:[3,5,6], poster:'/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg', back:'/87hTDiay2N2qWyX4Ds7wsPYMontS.jpg', overview:'An insomniac office worker and a soap salesman form an underground fight club.',tags:['dark','twist','identity']},
+  {id:11, title:'Parasite',                     year:2019,rating:8.6,genres:[3,5,6], poster:'/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg', back:'/ApiBzeaa95TNYliSbQ8pJv4Fje7s.jpg', overview:'Class discrimination threatens the bond between a wealthy and a destitute family.',tags:['korean','social','thriller']},
+  {id:28, title:'Goodfellas',                   year:1990,rating:8.7,genres:[3,6],   poster:'/6QMSLvU5ziIL2T6VrkaaSf3zG4y.jpg', back:'/sw7mordbZxgITU877yTpZCud90M.jpg', overview:'The story of Henry Hill and his life in the mob spanning decades.',tags:['mafia','classic','scorsese']},
+  {id:29, title:'The Silence of the Lambs',     year:1991,rating:8.6,genres:[5,3,12],poster:'/uS9m8OBk1A8eM9I042bx8XXpqAq.jpg', back:'/mfwq2nMBzArzQ7Y9RKE8SKeeTkg.jpg', overview:'An FBI cadet gets help from a cannibalistic killer to catch another serial killer.',tags:['horror','psychological','iconic']},
+  {id:30, title:'The Wolf of Wall Street',      year:2013,rating:8.2,genres:[3,6,10],poster:'/pWHf4khOloNVhKXcuKpODFasdmr.jpg', back:'/ugSTr7MkMRHh07MkMtBqJb6fgNh.jpg', overview:'The true story of Jordan Belfort\'s rise and fall as a wealthy stock broker.',tags:['greed','excess','biography']},
+  {id:31, title:'Se7en',                        year:1995,rating:8.6,genres:[5,3,6], poster:'/6yoghtyTpznpBik8EngEmJskVg9.jpg', back:'/7uoiKOEjxBBQHgHDp8G2R3UNiAb.jpg', overview:'Two detectives hunt a serial killer who uses the seven deadly sins as motives.',tags:['detective','dark','thriller']},
+  {id:32, title:'Joker',                        year:2019,rating:8.4,genres:[3,6],   poster:'/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg', back:'/n6bUvigpRFqSwmPp1m2YADwSMjC.jpg', overview:'A failed stand-up comedian is driven to madness and turns to a life of crime.',tags:['dark','character','origin']},
+  {id:33, title:'Prisoners',                    year:2013,rating:8.1,genres:[5,3,6], poster:'/iLBuVpDpoBaTpSFoixGEHaG6MkT.jpg', back:'/ebZin7oRdUuGY0XkgpBbFTT2UVa.jpg', overview:'When his daughter goes missing, a desperate father takes matters into his own hands.',tags:['kidnap','thriller','intense']},
+  {id:34, title:'Knives Out',                   year:2019,rating:7.9,genres:[5,3,10],poster:'/pThyQovXQrpS44DVqczjXGeJB3t.jpg', back:'/z0FmrGsIe7Hc3KQJkKb2MhBZCIH.jpg', overview:'A detective investigates the death of a famous crime novelist in a whodunit.',tags:['mystery','whodunit','comedy']},
+  {id:35, title:'Gone Girl',                    year:2014,rating:8.1,genres:[5,3,6], poster:'/fCayJrkfRaCRCTh8GqN30f8oyQF.jpg', back:'/iKfslMoMSWJYSMHnFHNaXCFv7kR.jpg', overview:'A man becomes a suspect when his wife disappears on their wedding anniversary.',tags:['marriage','mystery','dark']},
+  {id:75, title:'No Country for Old Men',       year:2007,rating:8.2,genres:[5,3,6], poster:'/bj1v6YKFDdIoSBGkHpWHBjNj64T.jpg', back:'/rBuU7fGQ8rTRFNaAEVzZRZ1tKv0.jpg', overview:'A hunter stumbles upon a drug deal gone wrong and a merciless killer pursues him.',tags:['coen','western','tense']},
+  {id:76, title:'Zodiac',                       year:2007,rating:7.7,genres:[5,3,6], poster:'/mkl5jDaZOhQROCO1H0XJYQ4BRKS.jpg', back:'/wCzC8aBpRJPQDQSIAtFTCMd2XP9.jpg', overview:'Investigators and reporters obsess over the Zodiac Killer for decades.',tags:['detective','serial-killer','fincher']},
+  {id:77, title:'Heat',                         year:1995,rating:8.3,genres:[3,1,5], poster:'/zMyfPUelumio3tiDKPffaUpsQTD.jpg', back:'/rfEXNlql4CafRmtgp7het0z3eFM.jpg', overview:'A seasoned detective and a brilliant thief square off in Los Angeles.',tags:['crime','cop','classic']},
+  {id:78, title:'Oldboy',                       year:2003,rating:8.4,genres:[5,3,6], poster:'/pWEl3hn4NbdAZgJdC4IQNFZ2KKH.jpg', back:'/4C9bVlf6APvBZHGFagaDovIGGN8.jpg', overview:'A man imprisoned for 15 years without explanation is suddenly released.',tags:['korean','revenge','shocking']},
+
+  // ── SCI-FI / ADVENTURE ──
+  {id:36, title:'Dune',                         year:2021,rating:8.0,genres:[4,1,7], poster:'/d5NXSklpcvkDkqMIBBXdnGmqMTY.jpg', back:'/iopYFB1b6Bh7FWZh3onQhph1sih.jpg', overview:'Paul Atreides travels to the most dangerous planet in the universe.',tags:['scifi','epic','worldbuilding']},
+  {id:37, title:'Oppenheimer',                  year:2023,rating:8.9,genres:[6,7,1], poster:'/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg', back:'/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg', overview:'The story of J. Robert Oppenheimer and the development of the atomic bomb.',tags:['historical','epic','biography']},
+  {id:38, title:'Avatar',                       year:2009,rating:7.9,genres:[4,7,8], poster:'/jRXYjXNq0Cs2TcJjLkki24MLp7u.jpg', back:'/o0s4XsEDfDlvit5pDRKjzXR4pp2.jpg', overview:'A paraplegic Marine is dispatched to the moon Pandora on a unique mission.',tags:['scifi','nature','visual']},
+  {id:39, title:'Blade Runner 2049',            year:2017,rating:8.0,genres:[4,5,6], poster:'/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg', back:'/ilRyazdMlG6WMq9JleSjBo2HYoN.jpg', overview:'A young blade runner discovers a long-buried secret.',tags:['scifi','neo-noir','visual']},
+  {id:40, title:'Arrival',                      year:2016,rating:7.9,genres:[4,5,6], poster:'/x2FJsf1ElAgr63Y3PNPtJrcmpoe.jpg', back:'/ygdvc2nGVNGWzDQDCFKqKf5YY7H.jpg', overview:'A linguist works with the military to communicate with alien visitors.',tags:['scifi','language','twist']},
+  {id:41, title:'The Martian',                  year:2015,rating:8.0,genres:[4,7,6], poster:'/5BHuvQ6p9kfc091Z8RiFNhCwL4b.jpg', back:'/AjkEZOEExFpkz0VlJnQWwrHgiNH.jpg', overview:'An astronaut stranded on Mars must find a way to survive until rescue.',tags:['survival','space','science']},
+  {id:42, title:'Gravity',                      year:2013,rating:7.7,genres:[4,7,5], poster:'/oYWgSEMCu3YgOMSFBfFAuKXDSLp.jpg', back:'/bk0HkAApqcVijMIVJh1iDpSRXgj.jpg', overview:'Two astronauts work together to survive after an accident leaves them adrift in space.',tags:['space','survival','tension']},
+  {id:43, title:'2001: A Space Odyssey',        year:1968,rating:8.3,genres:[4,7,6], poster:'/ve72VxNqjIqd6EmZtqznfp3w3b1.jpg', back:'/lBDwDtqGFNJezlMeHEEsBqoDoLD.jpg', overview:'A voyage to Jupiter becomes a battle between humans and a sinister AI.',tags:['kubrick','scifi','classic']},
+  {id:44, title:'E.T. the Extra-Terrestrial',   year:1982,rating:7.9,genres:[4,7,8], poster:'/an0nD6uq7tMgSBJFWgSLSHVtcNm.jpg', back:'/5hNcsnMkwU2LknLoru73c76el3z.jpg', overview:'A lonely boy befriends a gentle alien stranded on Earth.',tags:['classic','family','alien']},
+  {id:79, title:'Dune: Part Two',               year:2024,rating:8.5,genres:[4,1,7], poster:'/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg', back:'/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg', overview:'Paul Atreides unites with the Fremen while on a warpath of revenge.',tags:['scifi','epic','sequel']},
+  {id:80, title:'Star Wars: A New Hope',        year:1977,rating:8.6,genres:[4,1,7], poster:'/6FfCtAuVAW8XJjZ7eWeLibRLWTw.jpg', back:'/zqkmTXzjkAgXmEWLRsY4zcUIEgg.jpg', overview:'A young farm boy joins the rebellion against the evil Galactic Empire.',tags:['scifi','classic','space-opera']},
+  {id:81, title:'The Terminator',               year:1984,rating:8.1,genres:[4,1,5], poster:'/qvktm0BHcnmDpQDBaos75rHM1oe.jpg', back:'/kRFBMxvqSwYwWcNhUXpFHxeH5TS.jpg', overview:'A cyborg assassin is sent back in time to kill a woman whose unborn son will lead a revolution.',tags:['scifi','time-travel','classic']},
+  {id:82, title:'Back to the Future',           year:1985,rating:8.5,genres:[4,7,10],poster:'/fNOH9f1aA7XRTzl1sAOx9iF553Q.jpg', back:'/AbRYgStkPBFATo3zc9QV4Hlbm3u.jpg', overview:'A teenager is accidentally sent 30 years into the past in a time-travelling DeLorean.',tags:['scifi','time-travel','comedy']},
+
+  // ── DRAMA ──
+  {id:6,  title:'The Shawshank Redemption',     year:1994,rating:9.3,genres:[6],     poster:'/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg', back:'/iNh3BivHyg5sQRPP1KOkzguEX0H.jpg', overview:'Two imprisoned men bond over years finding solace and redemption through decency.',tags:['hope','friendship','prison']},
+  {id:8,  title:'Forrest Gump',                 year:1994,rating:8.8,genres:[6,8],   poster:'/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg', back:'/qdIMHd4sEfJSckfVJfKQvisL02a.jpg', overview:'A man with low IQ accidentally influences many major historical events.',tags:['heartwarming','life','classic']},
+  {id:12, title:'Schindler\'s List',             year:1993,rating:8.9,genres:[6,7],   poster:'/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg', back:'/loRmRzQXZeqG78TqZEWbiOrTP7Q.jpg', overview:'A businessman saves the lives of more than a thousand Jewish refugees during WWII.',tags:['historical','tragic','important']},
+  {id:15, title:'Whiplash',                     year:2014,rating:8.5,genres:[6,10],  poster:'/7fn624j5lj3xTme2SgiLCeuedmO.jpg', back:'/ljJbKpRxiCn14aCLGLeTgNV9Kqz.jpg', overview:'A promising young drummer is pushed to the limit by an abusive music teacher.',tags:['music','obsession','intense']},
+  {id:45, title:'12 Years a Slave',             year:2013,rating:8.1,genres:[6,7],   poster:'/xdANQHTFHjBNvmXJeVGJcMJSRRx.jpg', back:'/al2SHoEMfkXMEWRZmkOXvGqMncw.jpg', overview:'The true story of a free Black man kidnapped into slavery in 1840s America.',tags:['historical','powerful','biography']},
+  {id:46, title:'The Pursuit of Happyness',     year:2006,rating:8.0,genres:[6,8],   poster:'/lBKRUBliuRK0zLbdpiRMPiB3f2k.jpg', back:'/dJ0mdJbCDgLsYCqbFtbF7KJxUeq.jpg', overview:'A struggling salesman takes custody of his son as he tries to make it on Wall Street.',tags:['inspiring','fatherhood','struggle']},
+  {id:47, title:'A Beautiful Mind',             year:2001,rating:8.2,genres:[6,7],   poster:'/zwzWCwH72OSC9NA0ipoqynGsLJn.jpg', back:'/5WJnMDHVFOmeMSgqT3kl7htCHyS.jpg', overview:'A brilliant mathematician makes an astonishing discovery but struggles with mental illness.',tags:['biography','genius','mental-health']},
+  {id:48, title:'American History X',           year:1998,rating:8.5,genres:[6,3],   poster:'/euYIwmwkmz95mnXvufEmbL6ovhZ.jpg', back:'/u7qi7SVLV8fKEWKVMvBJPq3z3EL.jpg', overview:'A former neo-nazi skinhead tries to prevent his brother from going down the same path.',tags:['race','redemption','powerful']},
+  {id:49, title:'The Green Mile',               year:1999,rating:8.6,genres:[6,7],   poster:'/velWPhVMQeQKcxggNEU8YmU1xZu.jpg', back:'/xCO4K1NJFgBJ4qyJT5e44wW3SC6.jpg', overview:'The lives of guards on Death Row are affected by one of their inmates.',tags:['prison','supernatural','emotional']},
+  {id:83, title:'Good Will Hunting',            year:1997,rating:8.3,genres:[6,8,10],poster:'/bABCcRLia7YeoQ1ZudXyBja5GoD.jpg', back:'/6LPNxSJ2VE3qJzWfmYLbxbmgPFq.jpg', overview:'A janitor at MIT has a gift for mathematics and is pushed to fulfill his potential.',tags:['genius','therapy','boston']},
+  {id:84, title:'Titanic',                      year:1997,rating:7.9,genres:[6,8,7], poster:'/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg', back:'/kHXEpyfl6zqn8a6YuU4kTakWVsK.jpg', overview:'A young couple from different social classes fall in love aboard the ill-fated ship.',tags:['romance','tragic','epic']},
+  {id:85, title:'The Pianist',                  year:2002,rating:8.5,genres:[6,7],   poster:'/2hFvxCCWrTmCYwfy7yum0GKRi3Y.jpg', back:'/tP4ywbKoGS0qEjBqOpVe0CxPRFt.jpg', overview:'A Polish Jewish pianist struggles to survive the destruction of the Warsaw ghetto.',tags:['war','biography','survival']},
+  {id:86, title:'Manchester by the Sea',        year:2016,rating:7.8,genres:[6],     poster:'/3VSoVEcLOyXTBKmF5BFRkXumC3N.jpg', back:'/pcmtHlPblLNHNdxKFqGKRFJP4dS.jpg', overview:'A man is appointed guardian of his nephew after his brother dies.',tags:['grief','family','indie']},
+  {id:87, title:'1917',                         year:2019,rating:8.3,genres:[6,7,1], poster:'/iZf0KyrE25z1sage4SYFLCCrMi9.jpg', back:'/n4PmKVSF0rEE8q59iS1xtT9WBLZ.jpg', overview:'Two British soldiers must deliver a message that could save the lives of 1600 men.',tags:['war','one-shot','wwi']},
+  {id:88, title:'Parasite',                     year:2019,rating:8.5,genres:[6,3,5], poster:'/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg', back:'/ApiBzeaa95TNYliSbQ8pJv4Fje7s.jpg', overview:'A poor family schemes their way into working for a wealthy family with life-changing consequences.',tags:['korean','satire','shocking']},
+
+  // ── COMEDY ──
+  {id:50, title:'The Grand Budapest Hotel',     year:2014,rating:8.1,genres:[10,7,3],poster:'/eWdyYQreja6JGCzqHWXpWHDrrPo.jpg', back:'/bFjCPwLcMOvMFx0gnAfREm6WXUQ.jpg', overview:'A legendary hotel concierge forms an unlikely friendship with a lobby boy.',tags:['wes-anderson','quirky','comedy']},
+  {id:51, title:'Superbad',                     year:2007,rating:7.6,genres:[10,8],   poster:'/sCy3mfCBILVQC6HfxODTsXVjfBT.jpg', back:'/xEiDLsVkfGBDqLuanM0AoFnWJg4.jpg', overview:'Two co-dependent high school seniors attempt to score alcohol before graduation.',tags:['teen','funny','friendship']},
+  {id:52, title:'The Hangover',                 year:2009,rating:7.7,genres:[10,7],   poster:'/uluhlXubGu1VxU63boQTo7xwDqa.jpg', back:'/2ysBPPcHzgJUFBFh7hNPO5R26MU.jpg', overview:'Three friends wake up after a bachelor party with no memory and a missing groom.',tags:['vegas','comedy','chaos']},
+  {id:53, title:'Home Alone',                   year:1990,rating:7.7,genres:[10,7],   poster:'/9wSbe4CwObACCQvaUVhWQyuk1pA.jpg', back:'/o0SIfEiGUSMoI5eIyGcjvdxgb11.jpg', overview:'An 8-year-old is accidentally left behind when his family flies to Paris.',tags:['family','christmas','classic']},
+  {id:89, title:'Game Night',                   year:2018,rating:7.0,genres:[10,3,5], poster:'/dsEMHLDQjlA0lFi5wOZD2GAXJOM.jpg', back:'/dEtVOufAa2AE1WpZA7QC7G6TiGl.jpg', overview:'A couple\'s game night becomes surreal when a murder mystery turns deadly real.',tags:['comedy','mystery','fun']},
+  {id:90, title:'Bridesmaids',                  year:2011,rating:6.8,genres:[10,8],   poster:'/hZ6TMNaSZjFJfMEEJv7CRl0CCVD.jpg', back:'/s15C7lWNKL60fJKMkGQdIhq5iLy.jpg', overview:'Competition between the maid of honor and a bridesmaid threatens to ruin a wedding.',tags:['comedy','female-lead','friendship']},
+  {id:91, title:'Step Brothers',                year:2008,rating:6.9,genres:[10],     poster:'/lqHx6VwMFKqDwGbYkHoiMPlLzTw.jpg', back:'/uGXnlm4vsMi3GKUH7RX1P5KoTHk.jpg', overview:'Two middle-aged men become rivals when their parents get married.',tags:['comedy','ridiculous','will-ferrell']},
+  {id:92, title:'Groundhog Day',                year:1993,rating:8.0,genres:[10,8,4], poster:'/gSm0M4Rtz6hLOZISJjk5JWKpXFP.jpg', back:'/6BRBhfzDYOoXNkZEahPDVjwf3RL.jpg', overview:'A cynical TV weatherman finds himself repeating the same day over and over.',tags:['comedy','time-loop','classic']},
+
+  // ── ANIMATION ──
+  {id:54, title:'Spider-Man: Into the Spider-Verse',year:2018,rating:8.4,genres:[11,1,7],poster:'/iiZZdoQBEYBv6id8su7ImL0oCbD.jpg', back:'/67EMrPdFye9g2liqFd1GFDX8wlu.jpg', overview:'Teen Miles Morales becomes Spider-Man and crosses dimensions to meet other Spider-heroes.',tags:['animation','superhero','colorful']},
+  {id:55, title:'Spirited Away',                year:2001,rating:8.6,genres:[11,7,4], poster:'/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg', back:'/bSr965jpike8W8KtRFMt2BCNJi9.jpg', overview:'A girl becomes trapped in a spirit world and must work to free herself and her parents.',tags:['ghibli','magic','japan']},
+  {id:56, title:'The Lion King',                year:1994,rating:8.5,genres:[11,7,6], poster:'/sKCr78MXSuXx40AqEL14PpIvKqB.jpg', back:'/1TUg5pO1VZ4B0Q1amk3OlXvlpXV.jpg', overview:'A young lion prince flees his kingdom only to learn the true meaning of responsibility.',tags:['disney','classic','emotional']},
+  {id:57, title:'WALL-E',                       year:2008,rating:8.4,genres:[11,4,8], poster:'/hbhFnRzzg6ZDmm8YAmxBnQpQIPh.jpg', back:'/vSNAFcn7Mj5IWkOGTlg3lz4GC0y.jpg', overview:'A waste-collecting robot falls in love and embarks on an epic space adventure.',tags:['pixar','scifi','love']},
+  {id:58, title:'Toy Story',                    year:1995,rating:8.3,genres:[11,7,10],poster:'/uXDfjJbdP4ijW5hWSBrPu9cdmR9.jpg', back:'/9FBwqcd9IRruEDUrTdcaafOMKUq.jpg', overview:'A cowboy doll is threatened by the arrival of a new toy in his owner\'s room.',tags:['pixar','friendship','classic']},
+  {id:93, title:'My Neighbor Totoro',           year:1988,rating:8.2,genres:[11,7],   poster:'/rtGDOeG9LzoerkDGZF9dnVeLppL.jpg', back:'/fOFDHqKxlhj0V0cXeZjrKMBiRKL.jpg', overview:'Two sisters move to the countryside and discover magical forest spirits.',tags:['ghibli','family','gentle']},
+  {id:94, title:'Coco',                         year:2017,rating:8.4,genres:[11,7,8], poster:'/gGEsBPAijhVUFoiNpgZXqRVWJt2.jpg', back:'/askg3SMvhqEl4OL52YuvdtY40Yb.jpg', overview:'A boy travels to the land of the dead to find his great-great-grandfather.',tags:['pixar','family','mexican']},
+  {id:95, title:'Finding Nemo',                 year:2003,rating:8.2,genres:[11,7,10],poster:'/2DiNhHkSQFBxJRvSVWOi9UdHJiY.jpg', back:'/q1fkdh5oSQNYLYjUrTWxPv1tGYs.jpg', overview:'After his son is taken by a diver, a clownfish goes on a journey to find him.',tags:['pixar','ocean','adventure']},
+  {id:96, title:'Shrek',                        year:2001,rating:7.9,genres:[11,10,8],poster:'/iB64vpL3dIObOtMZgX3RqdVdQDc.jpg', back:'/TsD4ew7HwqwmKuY0MFnPGSmPPly.jpg', overview:'A grumpy ogre goes on a quest to rescue a princess who is more than she seems.',tags:['dreamworks','comedy','fairy-tale']},
+
+  // ── HORROR ──
+  {id:59, title:'Get Out',                      year:2017,rating:7.7,genres:[12,5,3], poster:'/tFXcEccSQMf3lfhfXKSU9iRBpa3.jpg', back:'/hPkqiGMnT44eoQUxoY60OzVj7P2.jpg', overview:'A Black man uncovers a disturbing secret when he visits his white girlfriend\'s family.',tags:['horror','social','twist']},
+  {id:60, title:'A Quiet Place',                year:2018,rating:7.5,genres:[12,5,4], poster:'/nAU74GmpUk7t5iklEp3bufwDq4n.jpg', back:'/roYyPiQWFGJrZbfFBePOEFCrDQm.jpg', overview:'A family struggles to survive in a world inhabited by creatures that hunt by sound.',tags:['horror','survival','tense']},
+  {id:61, title:'Hereditary',                   year:2018,rating:7.3,genres:[12,5],   poster:'/V1Ofy0htFGlCqKum6MhEBqRCtyA.jpg', back:'/dTpJQJIpORbPbBt6Jz9cSnL6bCX.jpg', overview:'After the family matriarch dies, a grieving family is haunted by sinister forces.',tags:['horror','family','terrifying']},
+  {id:62, title:'It',                           year:2017,rating:7.3,genres:[12,5],   poster:'/9E2y5Q7WlCVNEhP5GkVComwyUm9.jpg', back:'/nb3YKCqYhKVMTeGD6RJC2AKfBaO.jpg', overview:'A group of bullied kids face their worst fears when a sadistic clown terrorises their town.',tags:['horror','clown','childhood']},
+  {id:97, title:'The Conjuring',                year:2013,rating:7.5,genres:[12,5],   poster:'/wVYREutTvI2tmxr6ujrHT704wGF.jpg', back:'/nO7LLOM8AkUVZ6s9dEVNTgCNqJW.jpg', overview:'Paranormal investigators help a family terrorised by a dark presence on their farm.',tags:['horror','ghost','based-on-true']},
+  {id:98, title:'Midsommar',                    year:2019,rating:7.1,genres:[12,5],   poster:'/7LEI8ulZzO5gy9Ww2NVCrKmHeDZ.jpg', back:'/iRjBFRpKBHPXIBMYJkQ0zE8P5yG.jpg', overview:'A couple travel to Sweden for a folk festival that takes a sinister turn.',tags:['horror','folk','disturbing']},
+  {id:99, title:'The Shining',                  year:1980,rating:8.4,genres:[12,5],   poster:'/b6ko0IKC8MdYBBPkkA1aBPLe2yz.jpg', back:'/xBrw1lRnPK7jFKvYAtmBLq7rFLv.jpg', overview:'A family heads to an isolated hotel for the winter, where evil forces inhabit the place.',tags:['kubrick','horror','classic']},
+
+  // ── BOLLYWOOD (26 movies — all with unique correct TMDB poster IDs) ──
+  {id:101,title:'3 Idiots',                     year:2009,rating:8.4,genres:[9,10,8], poster:'/66A9MqXZyHKXkaF2hfQ789q5fYT.jpg', back:'/bPDZ2DjfDTBxMcMTcVUMKKUaGSs.jpg', overview:'Two friends search for their long-lost companion while recounting college memories.',tags:['college','friendship','comedy'],b:true},
+  {id:102,title:'Dangal',                       year:2016,rating:8.3,genres:[9,6],    poster:'/fBWnBZrGBxJYUaqBvCG0QJMCN2f.jpg', back:'/z8BHFa08e5f9UjG8X2YfuJxvJa7.jpg', overview:'Former wrestler Mahavir Singh Phogat trains his daughters to become world-class wrestlers.',tags:['sports','family','inspiring'],b:true},
+  {id:103,title:'Dilwale Dulhania Le Jayenge',  year:1995,rating:8.1,genres:[9,8,6],  poster:'/kbFoGgDHT7MMhLVWkMaaqnlGYCR.jpg', back:'/8yW0TOQHoWJuIqpAjGOEsxHiXLB.jpg', overview:'Two strangers fall in love on a European trip, but she is promised to someone else.',tags:['romance','classic','SRK'],b:true},
+  {id:104,title:'PK',                           year:2014,rating:8.1,genres:[9,10,6], poster:'/mEVEBH2VFByxPJ9RhmFuxEr3Q9M.jpg', back:'/kQG7y9pONM6G7PGNGVMqQNiKZjH.jpg', overview:'An alien on Earth loses his device to return home and challenges religious hypocrisy.',tags:['satire','religion','comedy'],b:true},
+  {id:105,title:'Andhadhun',                    year:2018,rating:8.2,genres:[9,5,3],  poster:'/8YFL3uDXGXBpuBiKCCqVk6GpSMJ.jpg', back:'/frLZHMX3fWPjVqDIhA4zfAKFlAP.jpg', overview:'A blind pianist accidentally becomes a witness to a murder.',tags:['thriller','plottwist','dark'],b:true},
+  {id:106,title:'Gully Boy',                    year:2019,rating:7.9,genres:[9,6,10], poster:'/xFjGHBBTMFEBBbL7HqaYxIm2jxI.jpg', back:'/iDGFQvZd4eShYstGYTdH6RMNJXY.jpg', overview:'A street rapper from Mumbai\'s slums rises to become a renowned hip-hop star.',tags:['music','rags-to-riches','rap'],b:true},
+  {id:107,title:'Taare Zameen Par',             year:2007,rating:8.4,genres:[9,6],    poster:'/mTTfTfQmzVT1JFEHbBjTpPLtCVb.jpg', back:'/gzgVMEVFNMYrb36jTb7bSGSmHXW.jpg', overview:'A teacher discovers that a troubled boy has dyslexia and exceptional artistic talent.',tags:['emotional','children','inspiring'],b:true},
+  {id:108,title:'Queen',                        year:2014,rating:8.1,genres:[9,8,6],  poster:'/j7y8vFNyUxnJLxwpDmSaBjzqsON.jpg', back:'/bYUhOLtqiJl9xHV4BJ5KaE3RFMF.jpg', overview:'A Delhi girl goes on her honeymoon alone after her fiancé cancels the wedding.',tags:['empowerment','solo','journey'],b:true},
+  {id:109,title:'Dil Chahta Hai',               year:2001,rating:8.1,genres:[9,10,8], poster:'/bYJHOmgWhJFqXBBPGMeVV5qfXwt.jpg', back:'/sPCZ3FouoJPxpLiGxDmAJHdPANc.jpg', overview:'Three inseparable friends go in different life directions but their bond remains strong.',tags:['friendship','Goa','modern'],b:true},
+  {id:110,title:'Zindagi Na Milegi Dobara',     year:2011,rating:8.2,genres:[9,8,7],  poster:'/rBBFpbKhujLNZExrRjkm24HDMLI.jpg', back:'/6Gw4MmDKcQnOtEA2lk0XpJO3JvZ.jpg', overview:'Three friends take a bachelor trip to Spain that turns into self-discovery.',tags:['roadtrip','Spain','friendship'],b:true},
+  {id:111,title:'Barfi!',                       year:2012,rating:8.1,genres:[9,8,6],  poster:'/a8y22E5fSuO0jfhNe6VSmPvRXnv.jpg', back:'/dSBHxMDuLMLmUAJmANjlbqeMgDy.jpg', overview:'A deaf-mute man falls in love with an autistic woman in a heartwarming story.',tags:['silent','comedy','heartwarming'],b:true},
+  {id:112,title:'Gangs of Wasseypur',           year:2012,rating:8.2,genres:[9,3,6],  poster:'/bJT3mGeYHsEUJjXjOFlJfIfMBrp.jpg', back:'/d5d4LiCTIEKj0p1jB0mB4D8PRHA.jpg', overview:'A coal mafia clash spans three generations of violent family rivalry in Bihar.',tags:['gangster','epic','cult'],b:true},
+  {id:113,title:'Uri: The Surgical Strike',     year:2019,rating:8.2,genres:[9,1,6],  poster:'/7Z3aN0dAJHVTkiKQ3gE4Dl9e22N.jpg', back:'/cFJSjJE3K4cxSBrTfkFv6bXbp3P.jpg', overview:'Indian army soldiers carry out a covert operation against militants at Uri.',tags:['action','patriotic','military'],b:true},
+  {id:114,title:'Kabir Singh',                  year:2019,rating:7.1,genres:[9,8,6],  poster:'/qmXAOALfJ5NzGK5oVXlFbEwDfA2.jpg', back:'/hvWY1cWQ1PBbRHMW0M8jqSmFO1R.jpg', overview:'A short-tempered surgeon turns to drugs when his girlfriend is forced to marry someone else.',tags:['romance','intense','controversial'],b:true},
+  {id:115,title:'Bajrangi Bhaijaan',            year:2015,rating:8.0,genres:[9,8,6],  poster:'/sGpLzgLlGXLHtOJN7TbsNdAhUhQ.jpg', back:'/rwHYobNsTKJf4kAEWCpIbXVe1XT.jpg', overview:'A man embarks on an extraordinary journey to return a mute Pakistani girl to her homeland.',tags:['emotional','humanity','SRK'],b:true},
+  {id:116,title:'Lagaan',                       year:2001,rating:8.1,genres:[9,7,6],  poster:'/o7PVBPSP7YNcUGJIVpFzKUfgimR.jpg', back:'/kDGJn7xBBCHmCGzmEp5sQuAbdQ3.jpg', overview:'Villagers in colonial India challenge their British rulers to a game of cricket.',tags:['cricket','colonial','epic'],b:true},
+  {id:117,title:'Mughal-E-Azam',                year:1960,rating:8.2,genres:[9,8,6],  poster:'/bISfVkMVeL5iWuXFHnUxTXm0qPD.jpg', back:'/hYWJPIfOwqQl1gBQrxjYfBvkmTI.jpg', overview:'The Mughal emperor Akbar fights against his son\'s love for a court dancer.',tags:['classic','historical','love'],b:true},
+  {id:118,title:'Swades',                       year:2004,rating:8.2,genres:[9,6],    poster:'/vTOKDJyCJQPiHMCOJVJSrV9Y1oC.jpg', back:'/AyjT8qKH7gxRuTtk5K2sORumR4L.jpg', overview:'An NRI scientist returns to India and is moved by the hardships of a small village.',tags:['patriotic','rural','SRK'],b:true},
+  {id:119,title:'Rang De Basanti',              year:2006,rating:8.2,genres:[9,6,1],  poster:'/dv7ZV9qBOjJLHMy4RJKHx9bL5bH.jpg', back:'/rMsmMikIMlERoFXl2EfmS3J0rSl.jpg', overview:'A British documentary filmmaker comes to India to make a film about freedom fighters.',tags:['patriotic','youth','powerful'],b:true},
+  {id:120,title:'Dil Dhadakne Do',              year:2015,rating:7.5,genres:[9,8,10], poster:'/m6YH0zMQSKKfkHSrLu8kJZ0BCVF.jpg', back:'/r0IWyPuImI5bkO7i23fUqhsYWFe.jpg', overview:'A dysfunctional family takes a cruise trip through Europe that changes everything.',tags:['family','cruise','comedy'],b:true},
+  {id:121,title:'Rockstar',                     year:2011,rating:7.9,genres:[9,8,6],  poster:'/jdqn8igsCr2mJ2ynCDRa2rH8r0D.jpg', back:'/mwm14VPDjuDlxpXGVVZJeNMkCdi.jpg', overview:'A young musician rises to fame while dealing with heartbreak and inner turmoil.',tags:['music','romance','ranbir'],b:true},
+  {id:122,title:'Kahaani',                      year:2012,rating:8.2,genres:[9,5,3],  poster:'/8QFDL44xGAm99KxzRqT6i6XMTJQ.jpg', back:'/qXmjNrB7pjFQmjAfChfFIW5V0Ar.jpg', overview:'A pregnant woman arrives in Kolkata searching for her missing husband.',tags:['thriller','mystery','female-lead'],b:true},
+  {id:123,title:'Dil Se',                       year:1998,rating:7.6,genres:[9,8,5],  poster:'/mzb5VMSf1ICBsGFUekDTBq9eqdi.jpg', back:'/s7c0hI9gFiBc2gHH3eNfDVakWUG.jpg', overview:'A radio journalist falls for a mysterious woman with dark secrets.',tags:['romance','political','SRK'],b:true},
+  {id:124,title:'Masaan',                       year:2015,rating:8.0,genres:[9,6,8],  poster:'/tNRQfgjcbGHkEMGpFIGGIPvNSKd.jpg', back:'/cB9Pb58nNMz5eL1G6gF8SDNL0MY.jpg', overview:'Two parallel stories of loss and love unfold in the holy city of Varanasi.',tags:['indie','poignant','varanasi'],b:true},
+  {id:125,title:'Article 15',                   year:2019,rating:8.1,genres:[9,3,6],  poster:'/r8RGpiSaKoHNxlI6QFKMO9GVOQZ.jpg', back:'/kfqLfaKfGUJo4x0o4XFGV5oBPde.jpg', overview:'A cop investigates the brutal murder of two girls in a caste-ridden rural India.',tags:['social','caste','important'],b:true},
+  {id:126,title:'Tumbbad',                      year:2018,rating:8.2,genres:[9,12,7], poster:'/aJnFzyfP88YGvqnFMpLrWxhZFwA.jpg', back:'/gSHBe1MkuXY5mP8H2C3WbxhkLFc.jpg', overview:'A man\'s greed leads him to a cursed village and its terrifying god of fortune.',tags:['horror','fantasy','unique'],b:true},
+];
+
+// ──────────────────────────────────────────────────────────────
+//  APP STATE
+// ──────────────────────────────────────────────────────────────
+const S = {
+  users:{u1:{id:'u1',name:'Alice'},u2:{id:'u2',name:'Riya'}},
+  activeUser:'u1',
+  watchHistory:{u1:[],u2:[]},
+  searchHistory:{u1:[],u2:[]},
+  ratings:{u1:{},u2:{}},
+  genreWeights:{u1:{},u2:{}},
+  genreFilter:null,
+  modalMovie:null,
+  modalTempRating:0,
+  searchTimer:null,
+  currentTab:'trending',
+};
+
+function imgUrl(p, big=false){ return p ? (big?IMG_W:IMG)+p : null; }
+
+// ──────────────────────────────────────────────────────────────
+//  TABS
+// ──────────────────────────────────────────────────────────────
+const TABS = ['trending','bollywood','toprated','action','drama','scifi','horror','comedy'];
+
+function showTab(tab){
+  S.currentTab = tab;
+  TABS.forEach(t=>{
+    const el = document.getElementById('tab-'+t);
+    if(el){ el.className = t===tab ? 'tab-btn active' : 'tab-btn inactive'; }
+  });
+  let movies;
+  if(tab==='bollywood')    movies = MOVIES.filter(m=>m.b);
+  else if(tab==='toprated')movies = [...MOVIES].sort((a,b)=>b.rating-a.rating);
+  else if(tab==='action')  movies = MOVIES.filter(m=>m.genres.includes(1));
+  else if(tab==='drama')   movies = MOVIES.filter(m=>m.genres.includes(6) && !m.b);
+  else if(tab==='scifi')   movies = MOVIES.filter(m=>m.genres.includes(4));
+  else if(tab==='horror')  movies = MOVIES.filter(m=>m.genres.includes(12));
+  else if(tab==='comedy')  movies = MOVIES.filter(m=>m.genres.includes(10));
+  else movies = [...MOVIES].sort(()=>Math.random()-0.35).slice(0,30); // trending
+  renderMovieGrid(movies);
+}
+
+// ──────────────────────────────────────────────────────────────
+//  MOVIE GRID
+// ──────────────────────────────────────────────────────────────
+function renderMovieGrid(movies){
+  const uid = S.activeUser;
+  const watched = new Set((S.watchHistory[uid]||[]).map(w=>w.movie.id));
+  const filtered = S.genreFilter ? movies.filter(m=>m.genres.includes(S.genreFilter)) : movies;
+  const grid = document.getElementById('discover-grid');
+  if(!filtered.length){
+    grid.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="empty-ico">🔭</div><p>No movies found for this filter.</p></div>';
+    return;
+  }
+  grid.innerHTML = filtered.map(m=>{
+    const pUrl = imgUrl(m.poster);
+    const isW  = watched.has(m.id);
+    const badge = isW
+      ? '<div class="mc-badge mc-badge-watched">✓ Seen</div>'
+      : m.b ? '<div class="mc-badge mc-badge-bw">🇮🇳 BW</div>' : '';
+    const img = pUrl
+      ? `<img class="mc-img" src="${pUrl}" loading="lazy" alt="${m.title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+         <div class="mc-placeholder" style="display:none"><div class="ph-icon">🎬</div><div class="ph-title-text">${m.title}</div></div>`
+      : `<div class="mc-placeholder"><div class="ph-icon">🎬</div><div class="ph-title-text">${m.title}</div></div>`;
+    return `<div class="mcard" onclick="openModal(${m.id})">
+      ${img}
+      <div class="mc-overlay"></div>
+      <div class="mc-actions">
+        <div class="mc-btn watch" onclick="event.stopPropagation();quickWatch(${m.id})">+ Watched</div>
+        <div class="mc-btn info">Info</div>
+      </div>
+      <div class="mc-score">★ ${m.rating}</div>
+      ${badge}
+      <div class="mc-title">${m.title}</div>
+      <div class="mc-year">${m.year}</div>
+    </div>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────────────────────
+//  SEARCH
+// ──────────────────────────────────────────────────────────────
+function onSearchInput(val){
+  clearTimeout(S.searchTimer);
+  if(val.length < 2){ closeDropdown(); return; }
+  S.searchTimer = setTimeout(()=>doSearch(val), 220);
+}
+
+function handleSearchKey(e){
+  if(e.key==='Escape') closeDropdown();
+  if(e.key==='Enter' && e.target.value.length>1) doSearch(e.target.value);
+}
+
+function doSearch(q){
+  recordSearch(q);
+  const ql = q.toLowerCase();
+  const r = MOVIES.filter(m=>
+    m.title.toLowerCase().includes(ql) ||
+    m.tags.some(t=>t.includes(ql)) ||
+    GENRES.filter(g=>m.genres.includes(g.id)).some(g=>g.name.toLowerCase().includes(ql))
+  ).slice(0,10);
+  const dd = document.getElementById('search-dropdown');
+  if(!r.length){
+    dd.innerHTML='<div style="padding:16px;font-size:13px;color:var(--muted);text-align:center">No results found</div>';
+    dd.classList.add('open'); return;
+  }
+  dd.innerHTML = r.map(m=>{
+    const pUrl = imgUrl(m.poster);
+    return `<div class="sd-item" onclick="openModal(${m.id});closeDropdown()">
+      ${pUrl
+        ? `<img class="sd-thumb" src="${pUrl}" loading="lazy" alt="" onerror="this.textContent='🎬'"/>`
+        : `<div class="sd-thumb" style="display:flex;align-items:center;justify-content:center;font-size:20px">🎬</div>`}
+      <div style="flex:1;min-width:0">
+        <div class="sd-title">${m.title}</div>
+        <div class="sd-year">${m.year}${m.b?' · Bollywood':''}</div>
+      </div>
+      <span class="sd-rating">★ ${m.rating}</span>
+    </div>`;
+  }).join('');
+  dd.classList.add('open');
+}
+
+function closeDropdown(){ document.getElementById('search-dropdown').classList.remove('open'); }
+document.addEventListener('click', e=>{ if(!e.target.closest('.search-wrap')) closeDropdown(); });
+
+function recordSearch(q){
+  q = q.trim(); if(!q || q.length<2) return;
+  const uid = S.activeUser;
+  S.searchHistory[uid] = [q,...(S.searchHistory[uid]||[]).filter(s=>s!==q)].slice(0,10);
+  updateStats(); renderSearchHistory();
+}
+
+function renderSearchHistory(){
+  const hist = S.searchHistory[S.activeUser]||[];
+  const el = document.getElementById('search-history-list');
+  if(!hist.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">No recent searches</div>'; return; }
+  el.innerHTML = hist.slice(0,5).map(q=>`
+    <div class="search-hist-item">
+      <span class="search-hist-q" onclick="document.getElementById('search-input').value='${q}';doSearch('${q}')">🔍 ${q}</span>
+      <span style="font-size:11px;color:var(--muted)">↗</span>
+    </div>`).join('');
+}
+
+// ──────────────────────────────────────────────────────────────
+//  WATCH HISTORY & RATINGS
+// ──────────────────────────────────────────────────────────────
+function addToWatchHistory(uid, movie, rating=0){
+  S.watchHistory[uid] = [{movie,ts:Date.now(),rating},...(S.watchHistory[uid]||[]).filter(w=>w.movie.id!==movie.id)].slice(0,60);
+  if(rating>0) S.ratings[uid] = {...(S.ratings[uid]||{}),[movie.id]:rating};
+  if(!S.genreWeights[uid]) S.genreWeights[uid]={};
+  const boost = rating>0 ? rating/5 : 0.4;
+  (movie.genres||[]).forEach(g=>{ S.genreWeights[uid][g]=(S.genreWeights[uid][g]||0)+boost; });
+  updateStats();
+}
+
+function renderWatchHistory(){
+  const hist = S.watchHistory[S.activeUser]||[];
+  const el = document.getElementById('watch-history-list');
+  if(!hist.length){
+    el.innerHTML='<div class="empty" style="padding:20px 0"><div class="empty-ico">📽</div><p style="font-size:12px">No movies watched yet</p></div>';
+    return;
+  }
+  el.innerHTML = hist.slice(0,10).map(w=>{
+    const pUrl = imgUrl(w.movie.poster);
+    const stars = w.rating>0 ? '<span class="hist-stars">'+'★'.repeat(Math.round(w.rating))+'</span>' : '';
+    return `<div class="hist-item">
+      ${pUrl
+        ? `<img class="hist-thumb" src="${pUrl}" loading="lazy" alt="" onerror="this.style.background='var(--s3)'"/>`
+        : `<div class="hist-thumb" style="display:flex;align-items:center;justify-content:center;font-size:16px">🎬</div>`}
+      <div style="flex:1;min-width:0">
+        <div class="hist-title">${w.movie.title}</div>
+        <div class="hist-meta">${w.movie.year}${w.rating>0?' · '+stars:''}</div>
+      </div>
+      <button class="hist-remove" onclick="removeFromHistory(${w.movie.id})" title="Remove">×</button>
+    </div>`;
+  }).join('');
+}
+
+function clearHistory(){
+  const uid = S.activeUser;
+  S.watchHistory[uid]=[]; S.ratings[uid]={}; S.genreWeights[uid]={};
+  // Reset rec panel back to CTA since no watch history
+  document.getElementById('rec-cta').style.display     = 'block';
+  document.getElementById('rec-results').style.display = 'none';
+  renderWatchHistory(); renderUserList(); updateStats();
+  toast('🗑 Watch history cleared');
+}
+
+function removeFromHistory(id){
+  const uid = S.activeUser;
+  S.watchHistory[uid] = (S.watchHistory[uid]||[]).filter(w=>w.movie.id!==id);
+  delete S.ratings[uid][id];
+  S.genreWeights[uid]={};
+  (S.watchHistory[uid]||[]).forEach(w=>{
+    const boost = w.rating>0 ? w.rating/5 : 0.4;
+    (w.movie.genres||[]).forEach(g=>{ S.genreWeights[uid][g]=(S.genreWeights[uid][g]||0)+boost; });
+  });
+  // If no history left, reset rec panel to CTA
+  if((S.watchHistory[uid]||[]).length === 0){
+    document.getElementById('rec-cta').style.display     = 'block';
+    document.getElementById('rec-results').style.display = 'none';
+  } else if(document.getElementById('rec-results').style.display !== 'none'){
+    renderRecommendations();
+  }
+  renderWatchHistory(); renderUserList(); updateStats();
+}
+
+// ──────────────────────────────────────────────────────────────
+//  RECOMMENDATION ENGINE
+// ──────────────────────────────────────────────────────────────
+function getRecommendations(uid, topN=10){
+  const weights = S.genreWeights[uid]||{};
+  if(!Object.keys(weights).length) return [];
+  const total = Object.values(weights).reduce((a,b)=>a+b,0)||1;
+  const norm = {}; Object.entries(weights).forEach(([g,w])=>norm[g]=w/total);
+  const topGenres = Object.entries(norm).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>parseInt(e[0]));
+  const watched = new Set((S.watchHistory[uid]||[]).map(w=>w.movie.id));
+  const searches = (S.searchHistory[uid]||[]).join(' ').toLowerCase();
+  return MOVIES
+    .filter(m=>!watched.has(m.id))
+    .map(m=>{
+      let score=0, reasons=[];
+      let gs=0; m.genres.forEach(g=>{ gs+=(norm[g]||0); });
+      if(gs>0){ score+=gs*45; if(m.genres.find(g=>topGenres.includes(g))) reasons.push('Matches your favourite genre'); }
+      score += (m.rating/10)*22;
+      if(m.rating>=8.5) reasons.push(`Critically acclaimed (★${m.rating})`);
+      else if(m.rating>=8.0) reasons.push(`Highly rated (★${m.rating})`);
+      if(searches && m.tags.some(t=>searches.includes(t))){ score+=18; reasons.push('Related to your searches'); }
+      if(m.b && (norm[9]||0)>0.1){ score+=(norm[9]||0)*18; reasons.push('Matches your Bollywood taste'); }
+      return {movie:m, score:Math.min(score,100), reasons:[...new Set(reasons)]};
+    })
+    .filter(r=>r.score>0)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,topN);
+}
+
+// Called only when user explicitly clicks the button
+function triggerRecommendations(){
+  const uid = S.activeUser;
+  const wc  = (S.watchHistory[uid]||[]).length;
+  if(wc === 0){
+    toast('⚠ Watch at least one movie first!'); return;
+  }
+  document.getElementById('rec-cta').style.display    = 'none';
+  document.getElementById('rec-results').style.display = 'block';
+  renderRecommendations();
+}
+
+function renderRecommendations(){
+  const uid  = S.activeUser;
+  const topN = parseInt(document.getElementById('top-n').value);
+  const recs = getRecommendations(uid, topN);
+  const out  = document.getElementById('rec-output');
+  const why  = document.getElementById('rec-why');
+  const weights = S.genreWeights[uid]||{};
+
+  if(Object.keys(weights).length>0){
+    const topNames = Object.entries(weights).sort((a,b)=>b[1]-a[1]).slice(0,3)
+      .map(([id])=>GENRES.find(g=>g.id==id)?.name).filter(Boolean);
+    const wc = (S.watchHistory[uid]||[]).length;
+    why.textContent = `Based on your ${wc} watched movie${wc!==1?'s':''} — top genres: ${topNames.join(', ')}.`;
+    why.classList.add('visible');
+  } else {
+    why.classList.remove('visible');
+  }
+
+  if(!recs.length){
+    out.innerHTML='<div class="empty"><div class="empty-ico">✨</div><p>Watch or rate some movies first<br/>to get personalised recommendations.</p></div>';
+    document.getElementById('s-recs').textContent='0';
+    return;
+  }
+  document.getElementById('s-recs').textContent = recs.length;
+  out.innerHTML = '<div class="rec-list">' + recs.map((r,i)=>{
+    const m  = r.movie;
+    const sb = Math.round(r.score);
+    const rb = Math.round((m.rating/10)*100);
+    const reason = r.reasons.slice(0,2).join(' · ') || 'Recommended for you';
+    const gnames = m.genres.slice(0,2).map(g=>GENRES.find(x=>x.id===g)?.name).filter(Boolean);
+    const pUrl = imgUrl(m.poster);
+    return `<div class="rcard${i<3?' top':''}" style="animation-delay:${i*0.06}s" onclick="openModal(${m.id})">
+      <div class="rcard-rank">${String(i+1).padStart(2,'0')}</div>
+      ${pUrl
+        ? `<img class="rcard-poster" src="${pUrl}" loading="lazy" alt="" onerror="this.style.background='var(--s3)'"/>`
+        : `<div class="rcard-poster" style="display:flex;align-items:center;justify-content:center;font-size:24px">🎬</div>`}
+      <div class="rcard-body">
+        <div class="rcard-title">${m.title}</div>
+        <div class="rcard-meta">
+          <span class="badge badge-muted">${m.year}</span>
+          ${m.b?'<span class="badge badge-teal">Bollywood</span>':''}
+          ${gnames.map(g=>`<span class="badge badge-purple">${g}</span>`).join('')}
+          <span class="badge badge-gold">★ ${m.rating}</span>
+        </div>
+        <div class="rcard-reason">${reason}</div>
+        <div class="rcard-bars">
+          <div class="bar-row"><span class="bar-label">Match</span><div class="bar-track"><div class="bar-fill bar-purple" style="width:${sb}%"></div></div><span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);min-width:32px;text-align:right">${sb}%</span></div>
+          <div class="bar-row"><span class="bar-label">Rating</span><div class="bar-track"><div class="bar-fill bar-teal" style="width:${rb}%"></div></div><span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);min-width:32px;text-align:right">${rb}%</span></div>
+        </div>
+        <button class="rcard-watch-btn" onclick="event.stopPropagation();quickWatch(${m.id})">+ Mark Watched</button>
+      </div>
+      <div class="rcard-score-box">
+        <div class="rcard-score">${sb}</div>
+        <div class="rcard-score-lbl">Score</div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// ──────────────────────────────────────────────────────────────
+//  MODAL
+// ──────────────────────────────────────────────────────────────
+function openModal(id){
+  closeDropdown();
+  const m = MOVIES.find(x=>x.id===id); if(!m) return;
+  S.modalMovie = m; S.modalTempRating = 0;
+  const uid = S.activeUser;
+  const existing = (S.ratings[uid]||{})[id]||0;
+  const pUrl = imgUrl(m.poster);
+  const bUrl = m.back ? imgUrl(m.back, true) : pUrl;
+  document.getElementById('modal-backdrop').src = bUrl||'';
+  document.getElementById('modal-poster').src   = pUrl||'';
+  document.getElementById('modal-title').textContent = m.title;
+  document.getElementById('modal-overview').textContent = m.overview;
+  const gnames = m.genres.map(g=>GENRES.find(x=>x.id===g)?.name).filter(Boolean);
+  document.getElementById('modal-meta').innerHTML =
+    `<span class="badge badge-muted">${m.year}</span>`+
+    `<span class="badge badge-gold">★ ${m.rating}</span>`+
+    (m.b?'<span class="badge badge-teal">Bollywood</span>':'')+
+    gnames.map(g=>`<span class="badge badge-purple">${g}</span>`).join('');
+  document.querySelectorAll('.mstar').forEach(s=>s.classList.toggle('on', parseInt(s.dataset.v)<=Math.round(existing)));
+  const isW = (S.watchHistory[uid]||[]).some(w=>w.movie.id===id);
+  const btn = document.getElementById('modal-watch-btn');
+  btn.textContent = isW ? '✓ Already Watched' : '+ Mark as Watched';
+  btn.style.opacity = isW ? '.5' : '1';
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  S.modalMovie = null;
+}
+
+function modalRate(val){
+  S.modalTempRating = val;
+  document.querySelectorAll('.mstar').forEach(s=>s.classList.toggle('on', parseInt(s.dataset.v)<=val));
+}
+
+function modalMarkWatched(){
+  if(!S.modalMovie) return;
+  addToWatchHistory(S.activeUser, S.modalMovie, S.modalTempRating||0);
+  const btn = document.getElementById('modal-watch-btn');
+  btn.textContent = '✓ Already Watched'; btn.style.opacity='.5';
+  renderWatchHistory();
+  renderUserList(); // always re-render so watch count updates for all users
+  // If recs panel is already open (user has clicked Get Recommendations before), refresh it silently
+  if(document.getElementById('rec-results').style.display !== 'none'){
+    renderRecommendations();
+  }
+  toast(`🎬 "${S.modalMovie.title}" added to your history!`);
+}
+
+function quickWatch(id){
+  const m = MOVIES.find(x=>x.id===id); if(!m) return;
+  addToWatchHistory(S.activeUser, m, 0);
+  renderWatchHistory();
+  renderUserList(); // always re-render so watch count updates for all users
+  // If recs panel is already open, refresh it silently
+  if(document.getElementById('rec-results').style.display !== 'none'){
+    renderRecommendations();
+  }
+  toast(`✓ "${m.title}" marked as watched!`);
+}
+
+// ──────────────────────────────────────────────────────────────
+//  USERS
+// ──────────────────────────────────────────────────────────────
+function addUser(){
+  const name = document.getElementById('new-user-input').value.trim();
+  if(!name) return toast('⚠ Enter a name first!');
+  const id = 'u'+Date.now();
+  S.users[id]={id,name};
+  S.watchHistory[id]=[]; S.searchHistory[id]=[]; S.ratings[id]={}; S.genreWeights[id]={};
+  document.getElementById('new-user-input').value='';
+  renderUserList(); switchUser(id);
+  toast(`👤 User "${name}" created!`);
+}
+
+function switchUser(uid){
+  S.activeUser = uid;
+  // Reset rec panel back to CTA state for this user
+  document.getElementById('rec-cta').style.display     = 'block';
+  document.getElementById('rec-results').style.display = 'none';
+  renderUserList(); renderWatchHistory(); renderSearchHistory(); updateStats();
+}
+
+const AVATAR_COLS = ['#c084fc','#34d399','#60a5fa','#fb7185','#fbbf24','#a78bfa'];
+function renderUserList(){
+  document.getElementById('user-list').innerHTML = Object.values(S.users).map((u,i)=>{
+    const col = AVATAR_COLS[i%AVATAR_COLS.length];
+    const wc = (S.watchHistory[u.id]||[]).length;
+    const isActive = S.activeUser===u.id;
+    return `<button class="user-tab${isActive?' active':''}" onclick="switchUser('${u.id}')">
+      <div class="u-avatar" style="background:${col}22;color:${col};${isActive?'outline:2px solid '+col+';outline-offset:2px':''}">${u.name.slice(0,2).toUpperCase()}</div>
+      <div><div class="u-name">${u.name}</div><div class="u-sub">${wc} movie${wc!==1?'s':''} watched</div></div>
+    </button>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────────────────────
+//  GENRE PILLS
+// ──────────────────────────────────────────────────────────────
+function renderGenrePills(){
+  document.getElementById('genre-pills').innerHTML =
+    `<button class="gpill${S.genreFilter===null?' on':''}" onclick="setGenre(null)">All</button>`+
+    GENRES.map(g=>`<button class="gpill${S.genreFilter===g.id?' on':''}" onclick="setGenre(${g.id})">${g.name}</button>`).join('');
+}
+
+function setGenre(id){ S.genreFilter=id; renderGenrePills(); showTab(S.currentTab); }
+
+// ──────────────────────────────────────────────────────────────
+//  STATS + TOAST
+// ──────────────────────────────────────────────────────────────
+function updateStats(){
+  const uid = S.activeUser;
+  document.getElementById('s-watched').textContent  = (S.watchHistory[uid]||[]).length;
+  document.getElementById('s-rated').textContent    = Object.values(S.ratings[uid]||{}).filter(r=>r>0).length;
+  document.getElementById('s-searches').textContent = (S.searchHistory[uid]||[]).length;
+}
+
+let _tt;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.innerHTML = msg; el.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(()=>el.classList.remove('show'), 2800);
+}
+
+// ──────────────────────────────────────────────────────────────
+//  INIT
+// ──────────────────────────────────────────────────────────────
+document.getElementById('top-n').addEventListener('change', ()=>{
+  if(document.getElementById('rec-results').style.display !== 'none') renderRecommendations();
+});
+renderUserList(); renderGenrePills(); renderWatchHistory(); renderSearchHistory();
+updateStats(); showTab('trending');
+</script>
+</body>
+</html>
