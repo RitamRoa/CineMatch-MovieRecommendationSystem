@@ -897,6 +897,32 @@ body{
 
 /* WRAP */
 .wrap{position:relative;z-index:1;max-width:1480px;margin:0 auto;padding:0 32px 100px;transition:var(--transition)}
+
+/* FINAL PERFORMANCE OVERRIDE: keep same look, remove frame-heavy motion */
+*{
+  animation:none !important;
+  transition:none !important;
+}
+
+*::before,
+*::after{
+  animation:none !important;
+  transition:none !important;
+}
+
+html{scroll-behavior:auto}
+
+.bar-fill,
+#toast,
+.modal,
+.modal-wrap,
+.search-dropdown,
+.mcard,
+.rcard,
+.mc-overlay,
+.mc-actions{
+  transition:none !important;
+}
 </style>
 </head>
 <body>
@@ -1270,6 +1296,25 @@ const S = {
   currentTab:'trending',
 };
 
+const GENRE_NAME_BY_ID = Object.fromEntries(GENRES.map(g=>[g.id, g.name.toLowerCase()]));
+const MOVIE_SEARCH_INDEX = MOVIES.map(m=>({
+  movie:m,
+  title:m.title.toLowerCase(),
+  tags:m.tags.join(' ').toLowerCase(),
+  genres:m.genres.map(id=>GENRE_NAME_BY_ID[id] || '').join(' ')
+}));
+
+const TAB_MOVIES = {
+  bollywood: MOVIES.filter(m=>m.b),
+  toprated: [...MOVIES].sort((a,b)=>b.rating-a.rating),
+  action: MOVIES.filter(m=>m.genres.includes(1)),
+  drama: MOVIES.filter(m=>m.genres.includes(6) && !m.b),
+  scifi: MOVIES.filter(m=>m.genres.includes(4)),
+  horror: MOVIES.filter(m=>m.genres.includes(12)),
+  comedy: MOVIES.filter(m=>m.genres.includes(10)),
+  trending: [...MOVIES].sort(()=>Math.random()-0.35).slice(0,30)
+};
+
 function imgUrl(p, big=false){ return p ? `posters/${p}` : null; }
 
 // ──────────────────────────────────────────────────────────────
@@ -1283,16 +1328,7 @@ function showTab(tab){
     const el = document.getElementById('tab-'+t);
     if(el){ el.className = t===tab ? 'tab-btn active' : 'tab-btn inactive'; }
   });
-  let movies;
-  if(tab==='bollywood')    movies = MOVIES.filter(m=>m.b);
-  else if(tab==='toprated')movies = [...MOVIES].sort((a,b)=>b.rating-a.rating);
-  else if(tab==='action')  movies = MOVIES.filter(m=>m.genres.includes(1));
-  else if(tab==='drama')   movies = MOVIES.filter(m=>m.genres.includes(6) && !m.b);
-  else if(tab==='scifi')   movies = MOVIES.filter(m=>m.genres.includes(4));
-  else if(tab==='horror')  movies = MOVIES.filter(m=>m.genres.includes(12));
-  else if(tab==='comedy')  movies = MOVIES.filter(m=>m.genres.includes(10));
-  else movies = [...MOVIES].sort(()=>Math.random()-0.35).slice(0,30); // trending
-  renderMovieGrid(movies);
+  renderMovieGrid(TAB_MOVIES[tab] || TAB_MOVIES.trending);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1349,22 +1385,21 @@ function renderMovieGrid(movies){
 function onSearchInput(val){
   clearTimeout(S.searchTimer);
   if(val.length < 2){ closeDropdown(); return; }
-  S.searchTimer = setTimeout(()=>doSearch(val), 220);
+  S.searchTimer = setTimeout(()=>doSearch(val, false), 220);
 }
 
 function handleSearchKey(e){
   if(e.key==='Escape') closeDropdown();
-  if(e.key==='Enter' && e.target.value.length>1) doSearch(e.target.value);
+  if(e.key==='Enter' && e.target.value.length>1) doSearch(e.target.value, true);
 }
 
-function doSearch(q){
-  recordSearch(q);
+function doSearch(q, persist=false){
+  if(persist) recordSearch(q);
   const ql = q.toLowerCase();
-  const r = MOVIES.filter(m=>
-    m.title.toLowerCase().includes(ql) ||
-    m.tags.some(t=>t.includes(ql)) ||
-    GENRES.filter(g=>m.genres.includes(g.id)).some(g=>g.name.toLowerCase().includes(ql))
-  ).slice(0,10);
+  const r = MOVIE_SEARCH_INDEX
+    .filter(ix=>ix.title.includes(ql) || ix.tags.includes(ql) || ix.genres.includes(ql))
+    .slice(0,10)
+    .map(ix=>ix.movie);
   const dd = document.getElementById('search-dropdown');
   if(!r.length){
     dd.innerHTML='<div style="padding:16px;font-size:13px;color:var(--muted);text-align:center">No results found</div>';
@@ -1410,7 +1445,7 @@ function renderSearchHistory(){
   if(!hist.length){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">No recent searches</div>'; return; }
   el.innerHTML = hist.slice(0,5).map(q=>`
     <div class="search-hist-item">
-      <span class="search-hist-q" onclick="document.getElementById('search-input').value='${q}';doSearch('${q}')">🔍 ${q}</span>
+      <span class="search-hist-q" onclick="document.getElementById('search-input').value='${q}';doSearch('${q}',true)">🔍 ${q}</span>
       <span style="font-size:11px;color:var(--muted)">↗</span>
     </div>`).join('');
 }
